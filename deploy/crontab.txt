@@ -1,0 +1,6 @@
+# Runs Laravel's scheduler every minute; it starts zk:sync every 30 minutes.
+# Install: sudo crontab -u www-data -e   and paste this line:
+* * * * * cd /var/www/attendance-app && php artisan schedule:run >> /dev/null 2>&1
+
+# Nightly database backup at 23:30, kept for 30 days (create /var/backups/attendance first):
+30 23 * * * mysqldump --single-transaction zk_attendance | gzip > /var/backups/attendance/zk_attendance_$(date +\%F).sql.gz && find /var/backups/attendance -name '*.sql.gz' -mtime +30 -delete

@@ -1,68 +1,87 @@
-# zkteco-sdk-php
+# Attendance Hub
 
-ZKLibrary is PHP Library for ZK Time & Attendance Devices. This library is design to reading and writing data to attendance device (fingerprint, face recognition or RFID) using UDP protocol. This library is useful to comunicate between web server and attendance device directly without any addition program. This library is implemented in the form of class. So that you can create an object and use it functions.
+A Laravel 13 + MySQL website for a ZKTeco fingerprint terminal (tested with an F22).
+It saves every punch to MySQL, shows live scans as they happen, and exports filtered CSV reports.
 
-Web server must be connected to the attendance device via Local Area Network (LAN). The UDP port that is used in this communication is 4370. You can not change this port without changing firmware of the attendance device. So, you just use it.
+## What it does
 
-The format of the data are: binary, string, and number. The length of the parameter and return value must be vary.
-# Example
+| Page | Who | What |
+|---|---|---|
+| Overview | everyone | Terminal status, today's numbers, memory use, live punch feed |
+| Attendance | everyone | All punches with search, Check in/out, employee, month and date filters, sorting, paging, CSV export |
+| Employees | everyone | People enrolled on the terminal |
+| Device | everyone (controls: admins) | Hardware details, storage, clock sync, speaker test, reboot |
+| Connection | admins | Terminal IP, port, protocol, timeout, comm key, connection test |
+| Logins | admins | Create, change and delete website logins |
+
+- **Administrators** can sync, change settings, control the terminal and manage logins.
+- **Viewers** can view and export only.
+
+## Run it on a Mac or PC (development)
+
+```bash
+composer install
+cp .env.example .env && php artisan key:generate   # then set DB_* in .env
+php artisan migrate
+php artisan zk:import-sqlite                       # one-time: copies storage/app/legacy/attendance.db into MySQL
+php artisan user:create you@example.com --name="Your Name" --role=admin
+
+php artisan serve --no-reload     # website on http://127.0.0.1:8000 (--no-reload enables the 4 workers set in .env)
+php artisan zk:listen             # in a second terminal: live punches
 ```
-<?php
 
- include("zklib/zklib.php");
+Works with MySQL 8+ or MariaDB 10.4+. On this Mac it uses XAMPP's MariaDB (`DB_CONNECTION=mariadb`, port 3307), so the `zk_attendance` database appears in XAMPP's phpMyAdmin.
 
-$zk = new ZKLibrary('192.168.1.102', 4370);
-$zk->connect();
-$zk->disableDevice();
+## Commands
 
-// $zk->setTime(date('Y-m-d H:i:s'));
-$zk->testVoice();
+| Command | Purpose |
+|---|---|
+| `php artisan zk:listen` | Captures punches in real time. Reconnects by itself. Keep it running. |
+| `php artisan zk:sync` | Downloads all employees and punches. All or nothing. Runs every 30 minutes through the scheduler. |
+| `php artisan zk:import-sqlite [path]` | Copies the old `attendance.db` and `config.json` into MySQL. Safe to run again. |
+| `php artisan user:create email --role=admin\|viewer` | Creates a login, or resets its password. |
 
-$zk->enableDevice();
-$zk->disconnect();
+## Host it in the office (Ubuntu mini PC or Raspberry Pi)
 
-?>
+The server must be on the **same network as the terminal**, ideally on a cable.
+
+```bash
+sudo apt install apache2 mysql-server php php-mysql php-xml php-mbstring php-curl php-zip unzip composer
+sudo mysql -e "CREATE DATABASE zk_attendance; CREATE USER 'zk_attendance'@'localhost' IDENTIFIED BY 'CHANGE-ME'; GRANT ALL ON zk_attendance.* TO 'zk_attendance'@'localhost';"
+
+sudo git clone <this repository> /var/www/attendance-app && cd /var/www/attendance-app
+composer install --no-dev --optimize-autoloader
+cp .env.example .env && php artisan key:generate
+#   In .env set: APP_ENV=production, APP_DEBUG=false, APP_URL, DB_PASSWORD
+php artisan migrate --force
+php artisan user:create you@example.com --role=admin
+php artisan config:cache && php artisan route:cache && php artisan view:cache
+sudo chown -R www-data:www-data storage bootstrap/cache
 ```
-#Data Structrure
-```
-Class ZKLibrary {
-    String ip;
-    Unsigned Short port;
-    Unsigned Long socket;
-    Unigned Long session_id;
-    String received_data;
-    String user_data[][];
-    String attendance_data[][];
-    Unsigned Long timeout_sec;
-    Unsigned Long timeout_usec;
-}
-```
-# Function
-```
-__construct($ip, $port)
-####Parameters
-$ip
 
-IP address of device.
+Then install the three files in [`deploy/`](deploy/):
 
-$port
+1. `apache-site.conf`: serves only `public/`.
+2. `attendance-listener.service`: keeps `zk:listen` running as a systemd service.
+3. `crontab.txt`: the scheduler (sync every 30 minutes) and a nightly MySQL backup. For the backup, put the database login in `~www-data/.my.cnf`.
 
-UDP port of device.
+Finally:
 
-disconnect()
-Function to disconnect from the device.
+- In the router, reserve fixed IP addresses for the terminal and for the server.
+- For access from outside the office, use **Tailscale** (or another VPN).
+- **Never** forward port 80 or 4370 to the internet.
 
-getUser()
-Get  of users.
+## Folder layout
 
-getAttendance()
-Get  attendance log.
+This is a standard Laravel project. The project-specific parts are:
 
-The role of user. The length of $role is 1 byte. Possible value of $role are:
-
-0 = LEVEL_USER
-2 = LEVEL_ENROLLER
-12 = LEVEL_MANAGER
-14 = LEVEL_SUPERMANAGER
-
-```
+| Path | What |
+|---|---|
+| `app/Libraries/ZKLib/` | ZKTeco protocol library (TCP/UDP on port 4370) |
+| `app/Services/` | `Terminal` (connection), `AttendanceStore` (saving to MySQL), `DeviceSync` (full sync, status) |
+| `app/Console/Commands/` | `zk:listen`, `zk:sync`, `zk:import-sqlite`, `user:create` |
+| `app/Http/Controllers/` | Pages and actions |
+| `resources/views/` | Blade pages |
+| `public/css/app.css`, `public/js/app.js`, `public/vendor/select2/` | Styles and scripts (no build step needed) |
+| `deploy/` | Apache, systemd and cron files for the office server |
+| `storage/app/legacy/` | The previous plain-PHP dashboard and its SQLite data, kept for reference. Not served and not in git. |
