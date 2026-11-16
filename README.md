@@ -61,10 +61,10 @@ cPanel shared hosting suits **push mode**. Direct mode won't work there: the ser
 2. **Database:** in **MySQL Databases**, create a database and a user, and give the user **All privileges** on it. cPanel adds a prefix, for example `cpuser_attendance`.
 3. **Repository:** in **Git™ Version Control**, click **Create**. Turn **Clone a Repository** off and set the path to `repositories/attendance-hub`. Copy the **Clone URL** it shows (`ssh://cpuser@host/home/cpuser/repositories/attendance-hub`).
 4. **Domain folder:** in **Domains**, set the domain's document root to `repositories/attendance-hub/public`. Never set it to the repository folder itself, which would expose `.env`.
-   **Or, in a sub-folder of an existing site** (for example `https://uat.example.com/attendance` with the code in `~/uat.example.com/attendance`): leave the document root alone. The project's own [`.htaccess`](.htaccess) sends every request into `public/`, so `.env`, the code and logs can't be downloaded, and `bootstrap/subfolder.php` makes the links include `/attendance`. Set `APP_URL=https://uat.example.com/attendance` and `SESSION_PATH=/attendance`. For push mode, add this at the very top of the **site's** `.htaccess` (`~/uat.example.com/.htaccess`), because the terminal always calls `/iclock/` at the domain root:
+   **Or, in a sub-folder of an existing site** (for example `https://uat.example.com/attendance` with the code in `~/uat.example.com/attendance`): leave the document root alone. The project's own [`.htaccess`](.htaccess) and [`index.php`](index.php) serve only files from `public/` and pass everything else to Laravel. That covers `.env`, the code and the logs, so they can't be downloaded. This works on Apache and LiteSpeed. Set `APP_URL=https://uat.example.com/attendance` and `SESSION_PATH=/attendance`. For push mode, add this at the very top of the **site's** `.htaccess` (`~/uat.example.com/.htaccess`), because the terminal always calls `/iclock/` at the domain root:
    ```apache
    RewriteEngine On
-   RewriteRule ^iclock/ attendance/public/index.php [L,QSA]
+   RewriteRule ^iclock/ attendance/index.php [L,QSA]
    ```
 5. **Settings file:** in **File Manager** (or over SSH), create `repositories/attendance-hub/.env` from `.env.example` and set:
    - `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://your-domain`

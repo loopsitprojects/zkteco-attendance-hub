@@ -1,17 +1,25 @@
 # Used only when this project folder sits inside a website folder (for example
 # ~/uat.loopsintegrated.co/attendance on cPanel) instead of the document root pointing at public/.
-# Every request goes into public/, so .env, the code, logs and error_log can never be downloaded.
+# Works on Apache and LiteSpeed. Only files in public/ are served directly; every other
+# request (including .env, composer.json, logs and the code) goes to Laravel, which says 404.
 
 Options -Indexes
+DirectoryIndex index.php
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Already inside public/: leave it to public/.htaccess
-    RewriteRule ^public/ - [L]
+    # The front controller (index.php beside this file)
+    RewriteRule ^index\.php$ - [L]
 
-    # Everything else is served from public/ (missing files fall through to Laravel's 404)
-    RewriteRule ^(.*)$ public/$1 [L]
+    # Files that exist in public/ are served from there.
+    # %1 is this folder's path on disk, worked out from the request.
+    RewriteCond %{REQUEST_FILENAME}::$1 ^(.*?/)(.*)::\2$
+    RewriteCond %1public/$1 -f
+    RewriteRule ^(.+)$ public/$1 [L]
+
+    # Everything else goes to Laravel
+    RewriteRule ^ index.php [L]
 </IfModule>
 
 # Without mod_rewrite nothing here is safe to serve
@@ -19,7 +27,7 @@ Options -Indexes
     Require all denied
 </IfModule>
 
-# Belt and braces: never serve dotfiles such as .env or .git from this folder
+# Never serve dotfiles such as .env or .git
 <FilesMatch "^\.">
     Require all denied
 </FilesMatch>
