@@ -1,33 +1,30 @@
-# Used only when this project folder sits inside a website folder (for example
-# ~/uat.loopsintegrated.co/attendance on cPanel) instead of the document root pointing at public/.
-# Works on Apache and LiteSpeed. Only files in public/ are served directly; every other
-# request (including .env, composer.json, logs and the code) goes to Laravel, which says 404.
-
+# Used when this project sits inside a sub-folder of a website (e.g. /attendance).
+# Compatible with both Apache and LiteSpeed Web Server.
 Options -Indexes
-DirectoryIndex index.php
+DirectoryIndex public/index.php index.php
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    RewriteBase /attendance/
 
-    # The front controller (index.php beside this file)
-    RewriteRule ^index\.php$ - [L]
+    # Allow direct access if already pointing to public/
+    RewriteCond %{REQUEST_URI} ^/attendance/public/
+    RewriteRule ^ - [L]
 
-    # Files that exist in public/ are served from there.
-    # %1 is this folder's path on disk, worked out from the request.
-    RewriteCond %{REQUEST_FILENAME}::$1 ^(.*?/)(.*)::\2$
-    RewriteCond %1public/$1 -f
-    RewriteRule ^(.+)$ public/$1 [L]
+    # Serve static assets directly from public/ if they exist
+    RewriteCond %{DOCUMENT_ROOT}/attendance/public/$1 -f [OR]
+    RewriteCond %{DOCUMENT_ROOT}/public_html/attendance/public/$1 -f
+    RewriteRule ^(.*)$ public/$1 [L]
 
-    # Everything else goes to Laravel
-    RewriteRule ^ index.php [L]
+    # Send all other requests to public/index.php
+    RewriteRule ^(.*)$ public/index.php [L,QSA]
 </IfModule>
 
-# Without mod_rewrite nothing here is safe to serve
-<IfModule !mod_rewrite.c>
-    Require all denied
-</IfModule>
-
-# Never serve dotfiles such as .env or .git
+# Protect sensitive files and directories
 <FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+<FilesMatch "(composer\.(json|lock)|package(-lock)?\.json|artisan|error_log|phpunit\.xml)$">
     Require all denied
 </FilesMatch>
