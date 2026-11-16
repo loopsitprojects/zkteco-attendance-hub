@@ -16,6 +16,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias(['admin' => \App\Http\Middleware\EnsureAdmin::class]);
+        $middleware->web(prepend: [\App\Http\Middleware\ForceHttps::class]);
+        // Only when a proxy (e.g. Cloudflare) sits in front: list its IPs in TRUSTED_PROXIES.
+        // Trusting everyone would let anyone fake their IP and dodge the login lockout.
+        if ($proxies = env('TRUSTED_PROXIES')) {
+            $middleware->trustProxies(at: $proxies === '*' ? '*' : explode(',', $proxies));
+        }
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo('/');
     })

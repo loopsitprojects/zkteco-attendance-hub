@@ -62,6 +62,14 @@ class PushTest extends TestCase
         $this->assertSame(['CHECK IN', 'CHECK OUT', 'CHECK OUT'], $states);
     }
 
+    public function test_people_go_to_https_but_the_terminal_stays_on_http(): void
+    {
+        config(['app.url' => 'https://attendance.example.com']);
+
+        $this->get('http://attendance.example.com/login')->assertRedirect('https://attendance.example.com/login');
+        $this->get('http://attendance.example.com/iclock/cdata?SN=TESTSN1&options=all')->assertOk();
+    }
+
     public function test_check_ins_mark_the_terminal_online(): void
     {
         $this->get('/iclock/getrequest?SN=TESTSN1&INFO=Ver%206.60,53,106,29185,192.168.1.77')->assertOk()->assertSee('OK');

@@ -1,0 +1,15 @@
+# cPanel deployment (Git Version Control). Runs after every push to the cPanel repository,
+# or when you click "Deploy HEAD Commit". The site runs straight from the repository folder:
+# point the domain's document root at <repository>/public.
+#
+# Before the first deployment, create .env in the repository folder on the server
+# (copy .env.example and fill it in). See "Host it on cPanel" in README.md.
+---
+deployment:
+  tasks:
+    # PHP 8.3 or newer. Change to the version your host offers (ea-php83, ea-php84 ...).
+    - export PHP=/opt/cpanel/ea-php83/root/usr/bin/php
+    - export COMPOSER=$(command -v composer || echo $HOME/composer.phar)
+    - $PHP $COMPOSER install --no-dev --optimize-autoloader --no-interaction
+    - $PHP artisan migrate --force
+    - $PHP artisan optimize

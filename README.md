@@ -51,6 +51,41 @@ Only terminals whose serial number is on the allowed list are accepted. Others g
 
 > This needs terminal firmware with the **Cloud Server / ADMS** menu. If your terminal doesn't have it, ask your supplier for the "push" (ADMS) firmware, or use Direct mode with a computer in the office.
 
+## Host it on cPanel (deploy with `git push`)
+
+cPanel shared hosting suits **push mode**. Direct mode won't work there: the server can't reach a terminal inside your office, and shared hosts don't allow the always-running `zk:listen`.
+
+**One-time setup**
+
+1. **PHP:** in **MultiPHP Manager**, set the domain to PHP **8.3 or newer**. Check that `pdo_mysql`, `mbstring`, `xml` and `zip` are enabled under **Select PHP Version → Extensions**.
+2. **Database:** in **MySQL Databases**, create a database and a user, and give the user **All privileges** on it. cPanel adds a prefix, for example `cpuser_attendance`.
+3. **Repository:** in **Git™ Version Control**, click **Create**. Turn **Clone a Repository** off and set the path to `repositories/attendance-hub`. Copy the **Clone URL** it shows (`ssh://cpuser@host/home/cpuser/repositories/attendance-hub`).
+4. **Domain folder:** in **Domains**, set the domain's document root to `repositories/attendance-hub/public`. Never set it to the repository folder itself, which would expose `.env`.
+5. **Settings file:** in **File Manager** (or over SSH), create `repositories/attendance-hub/.env` from `.env.example` and set:
+   - `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://your-domain`
+   - `DB_CONNECTION=mysql` plus the database name, user and password from step 2
+   - `ZK_MODE=push` and `ZK_PUSH_SERIALS=<terminal serial>`
+
+   Then generate a key: `php artisan key:generate` over SSH. Without SSH, create the key on your computer with `php artisan key:generate --show` and paste it into `APP_KEY`.
+6. **PHP path:** check the `PHP=` line in [`.cpanel.yml`](.cpanel.yml) matches your PHP version, for example `ea-php83` or `ea-php84`.
+
+**Deploy**
+
+```bash
+git remote add cpanel ssh://cpuser@host/home/cpuser/repositories/attendance-hub
+git push cpanel master
+```
+
+cPanel then runs `.cpanel.yml`: it installs packages, updates the database and caches the config. Every later `git push cpanel master` deploys again.
+If your host has no SSH access, use the **Pull or Deploy** tab instead. Clone from GitHub, then click **Update from Remote** and **Deploy HEAD Commit** after each GitHub push.
+
+**After the first deploy**
+
+- Create your login by running `php artisan user:create you@example.com --role=admin` over SSH or from **Terminal** in cPanel.
+- Optionally, in **Cron Jobs**, add `* * * * * cd ~/repositories/attendance-hub && /opt/cpanel/ea-php83/root/usr/bin/php artisan schedule:run >/dev/null 2>&1`. Push mode doesn't need it.
+- Turn on **SSL/TLS Status → AutoSSL** for the domain. Don't use cPanel's **Force HTTPS Redirect**. The app already sends people to HTTPS when `APP_URL` is `https://…`, but leaves `/iclock` on plain HTTP for the terminal.
+- On the terminal, set **Cloud Server Setting** as described in Push mode, with server port 80.
+
 ## Commands
 
 | Command | Purpose |
