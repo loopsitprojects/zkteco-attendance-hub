@@ -15,7 +15,8 @@ class ForceHttps
     public function handle(Request $request, Closure $next): Response
     {
         if (! $request->secure() && str_starts_with((string) config('app.url'), 'https://')) {
-            return redirect()->secure($request->getRequestUri(), 301);
+            // Built from the raw URL so a sub-folder such as /attendance isn't added twice
+            return redirect()->away('https://'.$request->getHttpHost().$request->getRequestUri(), 301);
         }
 
         return $next($request);

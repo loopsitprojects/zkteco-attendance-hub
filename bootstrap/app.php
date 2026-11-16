@@ -23,7 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
             $middleware->trustProxies(at: $proxies === '*' ? '*' : explode(',', $proxies));
         }
         $middleware->redirectGuestsTo(fn () => route('login'));
-        $middleware->redirectUsersTo('/');
+        $middleware->redirectUsersTo(fn () => route('dashboard'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
