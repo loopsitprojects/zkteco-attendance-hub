@@ -13,6 +13,9 @@ if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php'))
 // Register the Composer autoloader...
 require __DIR__.'/../vendor/autoload.php';
 
+// Support running from a sub-folder (e.g. /attendance) via the project's root .htaccess
+$_SERVER = (require __DIR__.'/../bootstrap/subfolder.php')($_SERVER);
+
 // Bootstrap Laravel and handle the request...
 /** @var Application $app */
 $app = require_once __DIR__.'/../bootstrap/app.php';

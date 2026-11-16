@@ -1,0 +1,25 @@
+# Used only when this project folder sits inside a website folder (for example
+# ~/uat.loopsintegrated.co/attendance on cPanel) instead of the document root pointing at public/.
+# Every request goes into public/, so .env, the code, logs and error_log can never be downloaded.
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Already inside public/: leave it to public/.htaccess
+    RewriteRule ^public/ - [L]
+
+    # Everything else is served from public/ (missing files fall through to Laravel's 404)
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# Without mod_rewrite nothing here is safe to serve
+<IfModule !mod_rewrite.c>
+    Require all denied
+</IfModule>
+
+# Belt and braces: never serve dotfiles such as .env or .git from this folder
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
