@@ -12,6 +12,43 @@
                 @csrf
                 @method('PUT')
                 <div class="field">
+                    <span class="field-label">How do punches reach this server?</span>
+                    <div class="protocols" style="grid-template-columns: 1fr 1fr;">
+                        <label class="protocol">
+                            <input type="radio" name="mode" value="direct" @checked(old('mode', $settings['mode']) === 'direct') onchange="showMode()">
+                            <span><strong>Direct</strong><small>This server connects to the terminal. Both must be on the same office network.</small></span>
+                        </label>
+                        <label class="protocol">
+                            <input type="radio" name="mode" value="push" @checked(old('mode', $settings['mode']) === 'push') onchange="showMode()">
+                            <span><strong>Push (Cloud Server)</strong><small>The terminal sends punches to this server over the internet. Works with cloud hosting.</small></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="pushFields">
+                    <div class="field">
+                        <label for="cfg_push_serials">Allowed terminal serial numbers</label>
+                        <input class="input" type="text" name="push_serials" id="cfg_push_serials" value="{{ old('push_serials', $settings['push_serials']) }}" placeholder="e.g. JJA1240201579">
+                        <span class="help">Only these terminals may send punches. Find it on the terminal under System Info → Device Info. Separate several with commas.</span>
+                    </div>
+                    <div class="alert alert-info" style="margin-bottom: 16px;">
+                        <strong style="color: var(--text);">On the terminal:</strong> Menu → COMM → Cloud Server Setting
+                        <table class="kv" style="margin-top: 8px;">
+                            <tr><th>Server mode</th><td>ADMS</td></tr>
+                            <tr><th>Enable domain name</th><td>{{ filter_var(request()->getHost(), FILTER_VALIDATE_IP) ? 'Off' : 'On' }}</td></tr>
+                            <tr><th>Server address</th><td><code>{{ request()->getHost() }}</code></td></tr>
+                            <tr><th>Server port</th><td><code>{{ request()->getPort() }}</code></td></tr>
+                            <tr><th>Proxy</th><td>Off</td></tr>
+                        </table>
+                        <div class="help" style="margin-top: 6px;">The address shown is the one you opened this page with. Use the server's public domain or IP, not 127.0.0.1 or localhost. Many terminals only support plain HTTP (port 80) for this.</div>
+                        <div style="margin-top: 8px;">
+                            Last check-in from the terminal: <strong style="color: var(--text);">{{ $pushLastSeen ?? 'never' }}</strong>@if ($pushIp) (terminal IP {{ $pushIp }})@endif
+                        </div>
+                    </div>
+                </div>
+
+                <div id="directFields">
+                <div class="field">
                     <label for="cfg_ip">Terminal IP address</label>
                     <input class="input" type="text" name="ip" id="cfg_ip" value="{{ old('ip', $settings['ip']) }}" placeholder="192.168.1.5" required>
                     <span class="help">Reserve this address for the terminal in your router so it never changes.</span>
@@ -44,6 +81,8 @@
                     <input class="input" type="number" name="comm_key" id="cfg_comm_key" value="{{ old('comm_key', $settings['comm_key']) }}" min="0">
                     <span class="help">The password set in the terminal's Comm menu. Leave 0 if none.</span>
                 </div>
+                </div>
+
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
                     <button type="submit" class="btn btn-primary">Save settings</button>
                     <button type="button" class="btn btn-secondary" id="btnTest" onclick="runConnectionTest()">Test connection</button>
@@ -72,6 +111,15 @@
 <script>
     const defaults = @json(config('zkteco'));
 
+    // Push mode needs only the serial numbers; direct mode needs the network settings.
+    function showMode() {
+        const push = document.querySelector('input[name="mode"]:checked')?.value === 'push';
+        document.getElementById('pushFields').style.display = push ? '' : 'none';
+        document.getElementById('directFields').style.display = push ? 'none' : '';
+        document.getElementById('btnTest').style.display = push ? 'none' : '';
+    }
+    showMode();
+
     function resetDefaultSettings() {
         document.getElementById('cfg_ip').value = defaults.ip;
         document.getElementById('cfg_port').value = defaults.port;
@@ -79,6 +127,9 @@
         document.getElementById('cfg_comm_key').value = defaults.comm_key;
         const radio = document.querySelector(`input[name="protocol"][value="${defaults.protocol}"]`);
         if (radio) radio.checked = true;
+        const mode = document.querySelector(`input[name="mode"][value="${defaults.mode}"]`);
+        if (mode) mode.checked = true;
+        showMode();
     }
 
     async function runConnectionTest() {

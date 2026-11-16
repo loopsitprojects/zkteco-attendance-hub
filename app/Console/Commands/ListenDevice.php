@@ -21,6 +21,13 @@ class ListenDevice extends Command
     public function handle(Terminal $terminal, AttendanceStore $store): int
     {
         while (true) {
+            // In push mode the terminal sends punches to the website itself; wait in case the mode changes back.
+            if ($terminal->isPush()) {
+                $this->line('Push mode is on: the terminal sends punches to the website directly. Checking again in 60 seconds.');
+                sleep(60);
+
+                continue;
+            }
             $settings = $terminal->settings();
             $this->line("Connecting to {$settings['ip']}:{$settings['port']} (".strtoupper($settings['protocol']).')...');
 

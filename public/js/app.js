@@ -56,8 +56,11 @@ const DeviceStatus = {
             chip.className = 'status-chip ' + (s.connected ? 'online' : 'offline');
             chip.querySelector('.dot').className = 'dot ' + (s.connected ? 'dot-online' : 'dot-offline');
             const name = s.deviceName ? ` · ${s.deviceName}` : '';
-            document.getElementById('deviceChipText').textContent = s.connected ? `Online (${s.protocol})${name}` : `Disconnected${name}`;
+            document.getElementById('deviceChipText').textContent = s.connected
+                ? `Online (${s.protocol})${name}`
+                : (s.mode === 'push' ? `Not checking in${name}` : `Disconnected${name}`);
 
+            this.mode = s.mode || 'direct';
             if (s.connected && s.deviceTime) {
                 this.clockBase = new Date(s.deviceTime.replace(' ', 'T')).getTime();
                 this.readAt = Date.now();
@@ -73,7 +76,7 @@ const DeviceStatus = {
     tick() {
         const el = document.getElementById('deviceClock');
         if (!el || !this.checked) return;
-        if (this.clockBase === null) { el.textContent = 'Not connected'; return; }
+        if (this.clockBase === null) { el.textContent = this.mode === 'push' ? 'Shown on the terminal' : 'Not connected'; return; }
         const d = new Date(this.clockBase + (Date.now() - this.readAt));
         const p = n => String(n).padStart(2, '0');
         el.textContent = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;

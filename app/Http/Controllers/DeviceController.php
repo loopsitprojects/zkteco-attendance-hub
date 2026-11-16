@@ -42,6 +42,9 @@ class DeviceController extends Controller
         $result = $sync->run();
 
         if (! $result['ok']) {
+            if ($result['error'] === 'push') {
+                return back()->with('success', 'Push mode is on: the terminal sends every punch to this server by itself, so there is nothing to download.');
+            }
             $reason = $result['error'] === 'offline' ? 'the terminal did not answer.' : 'the download from the terminal was incomplete.';
 
             return back()->with('error', "Sync failed and nothing was saved: {$reason} Your existing records are unchanged. Please try again.");
@@ -74,6 +77,9 @@ class DeviceController extends Controller
 
     public function restart(Terminal $terminal)
     {
+        if ($terminal->isPush()) {
+            return response()->json(['success' => false, 'message' => 'Not available in push mode: restart the terminal from its own menu.']);
+        }
         $zk = $terminal->connect();
         if (! $zk) {
             return response()->json(['success' => false, 'message' => 'Failed to connect to the terminal.']);
@@ -86,6 +92,9 @@ class DeviceController extends Controller
 
     private function withTerminal(Terminal $terminal, callable $action)
     {
+        if ($terminal->isPush()) {
+            return response()->json(['success' => false, 'message' => 'Not available in push mode: this server cannot connect to the terminal. Use the terminal\'s own menu.']);
+        }
         $zk = $terminal->connect();
         if (! $zk) {
             return response()->json(['success' => false, 'message' => 'Failed to connect to the terminal.']);

@@ -14,6 +14,9 @@ class Terminal
 {
     public const PROTOCOLS = ['tcp', 'udp', 'auto'];
 
+    /** direct: this server connects to the terminal. push: the terminal sends punches to this server (ADMS). */
+    public const MODES = ['direct', 'push'];
+
     public function settings(): array
     {
         $saved = DB::table('settings')->pluck('value', 'key')->all();
@@ -25,7 +28,20 @@ class Terminal
             'protocol' => (string) ($saved['protocol'] ?? $defaults['protocol']),
             'timeout_sec' => (int) ($saved['timeout_sec'] ?? $defaults['timeout_sec']),
             'comm_key' => (int) ($saved['comm_key'] ?? $defaults['comm_key']),
+            'mode' => (string) ($saved['mode'] ?? $defaults['mode']),
+            'push_serials' => (string) ($saved['push_serials'] ?? $defaults['push_serials']),
         ];
+    }
+
+    public function isPush(): bool
+    {
+        return $this->settings()['mode'] === 'push';
+    }
+
+    /** Serial numbers allowed to send punches in push mode. */
+    public function pushSerials(): array
+    {
+        return array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', $this->settings()['push_serials']))));
     }
 
     /** Saves new settings. Returns true when the address changed, meaning a different terminal. */

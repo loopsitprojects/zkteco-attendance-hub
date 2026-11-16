@@ -10,11 +10,15 @@ class LiveController extends Controller
     /** Punches captured by the listener. Answered from the database, without contacting the terminal. */
     public function feed(AttendanceStore $store)
     {
-        $heartbeat = (int) ($store->deviceState()['listener_heartbeat'] ?? 0);
+        $state = $store->deviceState();
+        $push = app(\App\Services\Terminal::class)->isPush();
+        $active = $push
+            ? time() - (int) ($state['push_last_seen'] ?? 0) < 120
+            : time() - (int) ($state['listener_heartbeat'] ?? 0) < 30;
 
         $rows = DB::table('attendance_logs as a')
             ->leftJoin('employees as e', 'e.user_id', '=', 'a.user_id')
-            ->where('a.source', 'live')
+            ->whereIn('a.source', ['live', 'push'])
             ->orderByDesc('a.created_at')->orderByDesc('a.id')
             ->limit(20)
             ->selectRaw("a.id, a.user_id, COALESCE(NULLIF(e.name, ''), a.employee_name) AS name,
@@ -22,7 +26,8 @@ class LiveController extends Controller
             ->get();
 
         return response()->json([
-            'listener_active' => (time() - $heartbeat) < 30,
+            'listener_active' => $active,
+            'mode' => $push ? 'push' : 'direct',
             'punches' => $rows,
         ], 200, [], JSON_INVALID_UTF8_SUBSTITUTE);
     }

@@ -16,6 +16,10 @@ class DeviceSync
     /** @return array{ok: bool, error?: string, employees?: int, logs?: int} */
     public function run(): array
     {
+        if ($this->terminal->isPush()) {
+            return ['ok' => false, 'error' => 'push'];
+        }
+
         // A full log download can take minutes on a slow link.
         set_time_limit(300);
 
@@ -58,6 +62,13 @@ class DeviceSync
     {
         if ($fresh) {
             Cache::forget('device-status');
+        }
+
+        // In push mode the terminal calls us; it is online if it checked in recently.
+        if ($this->terminal->isPush()) {
+            $lastSeen = (int) ($this->store->deviceState()['push_last_seen'] ?? 0);
+
+            return ['connected' => time() - $lastSeen < 120, 'protocol' => 'PUSH', 'deviceTime' => null, 'mode' => 'push'];
         }
 
         return Cache::remember('device-status', 20, function () {

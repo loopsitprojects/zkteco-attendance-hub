@@ -184,7 +184,73 @@ class AttendanceStore
         return (int) DB::table('attendance_logs')->where('user_id', $userId)->where('punch_time', $time)->value('id');
     }
 
-    private const LOG_UPDATES = "employee_name = COALESCE(VALUES(employee_name), attendance_logs.employee_name),
+    /** Verify codes in the push (ADMS) protocol differ from the SDK's. */
+    public const PUSH_VERIFY_LABELS = [0 => 'Password', 1 => 'Fingerprint', 2 => 'Card', 3 => 'Password', 4 => 'Card', 15 => 'Face'];
+
+    /**
+     * Saves punches the terminal pushed: [user id, time, raw state, verify code].
+     * Each affected person-day is then re-labelled, so punches arriving late or out
+     * of order still get the right Check In / Check Out. Returns how many were saved.
+     */
+    public function savePushedPunches(array $punches): int
+    {
+        if (! $punches) {
+            return 0;
+        }
+        $names = $this->employeeNames();
+        $now = now()->format('Y-m-d H:i:s');
+        $rows = [];
+        $days = [];
+        foreach ($punches as [$userId, $time, $state, $verify]) {
+            $rows[] = [$userId, $names[$userId] ?? null, 'CHECK IN', self::PUSH_VERIFY_LABELS[$verify] ?? 'Unknown', $verify, $state, $time, 'push', $now];
+            $days[$userId][substr($time, 0, 10)] = true;
+        }
+
+        DB::transaction(function () use ($rows, $days) {
+            // punch_state is left alone on re-sends; relabelDays sets it below
+            $this->bulkUpsert('attendance_logs',
+                ['user_id', 'employee_name', 'punch_state', 'verify_type', 'raw_status', 'raw_punch', 'punch_time', 'source', 'created_at'],
+                $rows,
+                'employee_name = COALESCE(VALUES(employee_name), attendance_logs.employee_name),
+                 verify_type = VALUES(verify_type), raw_status = VALUES(raw_status), raw_punch = VALUES(raw_punch)');
+            $this->relabelDays($days);
+        });
+
+        return count($rows);
+    }
+
+    /** First punch of each listed person-day is a Check In, the rest are Check Outs. */
+    public function relabelDays(array $days): void
+    {
+        foreach ($days as $userId => $dates) {
+            foreach (array_keys($dates) as $date) {
+                $ids = DB::table('attendance_logs')
+                    ->where('user_id', (string) $userId)
+                    ->whereBetween('punch_time', ["{$date} 00:00:00", "{$date} 23:59:59"])
+                    ->orderBy('punch_time')->pluck('id');
+                if ($ids->isEmpty()) {
+                    continue;
+                }
+                DB::table('attendance_logs')->where('id', $ids->first())->update(['punch_state' => 'CHECK IN']);
+                DB::table('attendance_logs')->whereIn('id', $ids->slice(1)->all())->update(['punch_state' => 'CHECK OUT']);
+            }
+        }
+    }
+
+    /** Adds or updates one person the terminal reported, without touching anyone else. */
+    public function saveEmployee(string $userId, ?string $name, int $role, ?string $card, ?string $group): void
+    {
+        $this->bulkUpsert('employees',
+            ['user_id', 'name', 'role', 'card', 'group_name', 'on_device', 'updated_at'],
+            [[$userId, trim(mb_scrub((string) $name, 'UTF-8')), $role, (string) $card, (string) $group, 1, now()->format('Y-m-d H:i:s')]],
+            "name = COALESCE(NULLIF(VALUES(name), ''), employees.name),
+             role = VALUES(role), card = VALUES(card), group_name = VALUES(group_name),
+             on_device = 1, updated_at = VALUES(updated_at)");
+        DB::table('attendance_logs')->where('user_id', $userId)->whereNull('employee_name')
+            ->update(['employee_name' => DB::raw('(SELECT name FROM employees WHERE employees.user_id = attendance_logs.user_id)')]);
+    }
+
+    private const LOG_UPDATES ="employee_name = COALESCE(VALUES(employee_name), attendance_logs.employee_name),
         punch_state = VALUES(punch_state), verify_type = VALUES(verify_type),
         raw_status = VALUES(raw_status), raw_punch = VALUES(raw_punch)";
 

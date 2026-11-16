@@ -15,6 +15,11 @@ class SyncDevice extends Command
     {
         $this->info('Syncing from the terminal...');
         $result = $sync->run();
+        if (! $result['ok'] && $result['error'] === 'push') {
+            $this->info('Push mode is on: the terminal sends punches by itself. Nothing to sync.');
+
+            return self::SUCCESS;
+        }
 
         if (! $result['ok']) {
             $this->error($result['error'] === 'offline'

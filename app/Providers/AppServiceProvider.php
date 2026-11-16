@@ -19,6 +19,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // A terminal checks in every 10 seconds and uploads in bursts; this only stops floods.
+        \Illuminate\Support\Facades\RateLimiter::for('adms', fn (\Illuminate\Http\Request $request) =>
+            \Illuminate\Cache\RateLimiting\Limit::perMinute(300)->by($request->ip()));
     }
 }

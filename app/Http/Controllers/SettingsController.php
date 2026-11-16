@@ -10,14 +10,34 @@ use Illuminate\Validation\Rule;
 
 class SettingsController extends Controller
 {
-    public function edit(Terminal $terminal)
+    public function edit(Terminal $terminal, AttendanceStore $store)
     {
-        return view('settings.index', ['settings' => $terminal->settings()]);
+        $state = $store->deviceState();
+        $settings = $terminal->settings();
+        // Offer the serial already read from the terminal, so push mode works first time
+        if ($settings['push_serials'] === '' && ! empty($state['serialNumber'])) {
+            $settings['push_serials'] = $state['serialNumber'];
+        }
+
+        return view('settings.index', [
+            'settings' => $settings,
+            'pushLastSeen' => isset($state['push_last_seen']) ? date('Y-m-d H:i:s', (int) $state['push_last_seen']) : null,
+            'pushIp' => $state['push_ip'] ?? null,
+        ]);
     }
 
     public function update(Request $request, Terminal $terminal, AttendanceStore $store)
     {
         $values = $this->validated($request);
+        $extra = $request->validate([
+            'mode' => ['required', Rule::in(Terminal::MODES)],
+            'push_serials' => ['nullable', 'string', 'max:500', 'regex:/^[A-Za-z0-9,\s]*$/', 'required_if:mode,push'],
+        ], [
+            'push_serials.required_if' => 'Enter the terminal\'s serial number to use push mode.',
+            'push_serials.regex' => 'Serial numbers may contain only letters and digits, separated by commas.',
+        ]);
+        $values['mode'] = $extra['mode'];
+        $values['push_serials'] = implode(',', array_filter(array_map('trim', preg_split('/[\s,]+/', (string) ($extra['push_serials'] ?? '')))));
 
         // Saved device details describe the old terminal if the address changed
         if ($terminal->saveSettings($values)) {

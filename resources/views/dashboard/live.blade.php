@@ -2,7 +2,7 @@
     <div class="card-header">
         <div>
             <h2>Live punches</h2>
-            <p>Saved by the real-time listener the moment someone scans. Refreshes every 2 seconds.</p>
+            <p>Saved the moment someone scans. Refreshes every 2 seconds.</p>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
             <span class="badge badge-idle" id="liveStatusPill">Checking listener…</span>
@@ -43,7 +43,9 @@
 
             const pill = document.getElementById('liveStatusPill');
             pill.className = 'badge ' + (feed.listener_active ? 'badge-live' : 'badge-idle');
-            pill.textContent = feed.listener_active ? '● Listener active' : '○ Listener not running';
+            pill.textContent = feed.mode === 'push'
+                ? (feed.listener_active ? '● Terminal sending (push)' : '○ Terminal not checking in')
+                : (feed.listener_active ? '● Listener active' : '○ Listener not running');
 
             const tbody = document.getElementById('realtimeBody');
             const shown = liveClearedAt ? data.filter(p => p.captured_at > liveClearedAt) : data;
@@ -52,7 +54,9 @@
                     ? 'View cleared. New scans will appear here.'
                     : feed.listener_active
                         ? 'Waiting for finger scans…'
-                        : 'No live punches saved yet. Start the listener (php artisan zk:listen) to capture them.'}</td></tr>`;
+                        : feed.mode === 'push'
+                            ? 'The terminal has not checked in. Check its Cloud Server setting and internet connection.'
+                            : 'No live punches saved yet. Start the listener (php artisan zk:listen) to capture them.'}</td></tr>`;
                 return;
             }
             tbody.innerHTML = shown.map((item, i) => `

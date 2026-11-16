@@ -32,6 +32,25 @@ php artisan zk:listen             # in a second terminal: live punches
 
 Works with MySQL 8+ or MariaDB 10.4+. On this Mac it uses XAMPP's MariaDB (`DB_CONNECTION=mariadb`, port 3307), so the `zk_attendance` database appears in XAMPP's phpMyAdmin.
 
+## Push mode: the terminal sends punches to a cloud server
+
+Use this mode to host the website on a cloud server with no computer in the office. The terminal connects out to the website by itself, so you don't need a VPN or port forwarding.
+
+1. Host the app on any internet server with PHP 8.3+ and MySQL/MariaDB (see below). Make sure `http://your-domain/iclock/cdata` is reachable over **plain HTTP**: many terminals can't use HTTPS for this, so don't force-redirect `/iclock` to HTTPS.
+2. In the website, go to **Connection**, choose **Push (Cloud Server)**, enter the terminal's serial number (System Info → Device Info), and save.
+3. On the terminal, go to **Menu → COMM → Cloud Server Setting** and set:
+   - **Server mode:** ADMS
+   - **Enable domain name:** On
+   - **Server address:** your domain
+   - **Server port:** 80
+   - **Proxy:** Off
+4. Within a minute, **Connection** shows a "Last check-in" time. The terminal then uploads any punches it hasn't sent before, and every new scan arrives within seconds.
+
+In push mode, Sync, clock sync, the speaker test and reboot are done from the terminal's own menu. `zk:listen` and `zk:sync` aren't needed.
+Only terminals whose serial number is on the allowed list are accepted. Others get `403` and are logged.
+
+> This needs terminal firmware with the **Cloud Server / ADMS** menu. If your terminal doesn't have it, ask your supplier for the "push" (ADMS) firmware, or use Direct mode with a computer in the office.
+
 ## Commands
 
 | Command | Purpose |
